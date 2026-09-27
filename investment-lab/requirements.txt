@@ -1,0 +1,5 @@
+alpaca-py==0.44.0
+backtesting==0.6.6
+numpy==2.4.6
+pandas==3.0.6
+pytest==9.1.1
