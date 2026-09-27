@@ -51,7 +51,12 @@ def _synthetic_bars(symbol: str, start: datetime, end: datetime, seed: int = 7) 
     return df
 
 
-def _alpaca_bars(symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
+def is_crypto_symbol(symbol: str) -> bool:
+    """Alpaca crypto pairs are written like "BTC/USD"; stocks never contain '/'."""
+    return "/" in symbol
+
+
+def _alpaca_stock_bars(symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
     from alpaca.data.historical import StockHistoricalDataClient
     from alpaca.data.requests import StockBarsRequest
     from alpaca.data.timeframe import TimeFrame
@@ -70,12 +75,32 @@ def _alpaca_bars(symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
     return bars
 
 
+def _alpaca_crypto_bars(symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
+    from alpaca.data.historical.crypto import CryptoHistoricalDataClient
+    from alpaca.data.requests import CryptoBarsRequest
+    from alpaca.data.timeframe import TimeFrame
+
+    client = CryptoHistoricalDataClient(
+        os.environ["ALPACA_API_KEY_ID"], os.environ["ALPACA_API_SECRET_KEY"]
+    )
+    request = CryptoBarsRequest(
+        symbol_or_symbols=symbol, timeframe=TimeFrame.Day, start=start, end=end
+    )
+    bars = client.get_crypto_bars(request).df
+    if isinstance(bars.index, pd.MultiIndex):
+        bars = bars.xs(symbol, level="symbol")
+    bars = bars.rename(columns=str.lower)[["open", "high", "low", "close", "volume"]]
+    bars.index.name = "timestamp"
+    return bars
+
+
 def load_bars(symbol: str, start: datetime, end: datetime) -> tuple[pd.DataFrame, str]:
     """Return (ohlcv_dataframe, source) where source is 'alpaca' or 'synthetic'."""
     have_creds = os.environ.get("ALPACA_API_KEY_ID") and os.environ.get("ALPACA_API_SECRET_KEY")
+    fetch = _alpaca_crypto_bars if is_crypto_symbol(symbol) else _alpaca_stock_bars
     if have_creds:
         try:
-            return _alpaca_bars(symbol, start, end), "alpaca"
+            return fetch(symbol, start, end), "alpaca"
         except Exception as exc:  # network/auth/plan issues -> fall back, don't crash the run
             print(
                 f"[data] Alpaca fetch failed ({exc!r}); falling back to synthetic data.",

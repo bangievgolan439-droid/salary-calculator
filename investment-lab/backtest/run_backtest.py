@@ -81,10 +81,11 @@ def main() -> None:
     equity_df, trades_df = run_backtest(bars, signals, risk_manager, initial_capital=args.initial_capital)
     metrics = compute_metrics(equity_df, trades_df, args.initial_capital)
 
+    safe_symbol = args.symbol.replace("/", "-")
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    equity_path = output_dir / f"{args.symbol}_equity_curve.csv"
-    trades_path = output_dir / f"{args.symbol}_trades.csv"
+    equity_path = output_dir / f"{safe_symbol}_equity_curve.csv"
+    trades_path = output_dir / f"{safe_symbol}_trades.csv"
     equity_df.to_csv(equity_path)
     trades_df.to_csv(trades_path, index=False)
 
